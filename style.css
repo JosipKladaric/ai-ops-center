@@ -3,7 +3,8 @@
     --sidebar-bg: #202020;
     --card-bg: #2b2b2b;
     --card-hover: #323232;
-    --accent-primary: #0078d4; /* Microsoft Fluent Blue */
+    --accent-primary: #0078d4;
+    /* Microsoft Fluent Blue */
     --accent-secondary: #2b88d8;
     --text-main: #ffffff;
     --text-muted: #adadad;
@@ -102,7 +103,9 @@ label {
     color: var(--text-muted);
 }
 
-input[type="text"], input[type="number"], textarea {
+input[type="text"],
+input[type="number"],
+textarea {
     width: 100%;
     background: #00000033;
     border: 1px solid var(--border-color);
@@ -115,7 +118,8 @@ input[type="text"], input[type="number"], textarea {
     transition: var(--transition);
 }
 
-input:focus, textarea:focus {
+input:focus,
+textarea:focus {
     border-bottom-color: var(--accent-primary);
     background: #00000066;
 }
@@ -310,7 +314,7 @@ textarea {
     font-size: 0.55rem;
     font-weight: 800;
     color: #f59e0b;
-    background: rgba(245,158,11,0.15);
+    background: rgba(245, 158, 11, 0.15);
     border-radius: 3px;
     padding: 0 4px;
     margin-right: 2px;
@@ -329,15 +333,15 @@ textarea {
 
 /* Agent card */
 .log-card {
-    background: rgba(255,255,255,0.025);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 8px;
     overflow: hidden;
     transition: border-color 0.2s;
 }
 
 .log-card:hover {
-    border-color: rgba(255,255,255,0.1);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .log-card-header {
@@ -345,8 +349,8 @@ textarea {
     align-items: center;
     gap: 8px;
     padding: 7px 12px;
-    background: rgba(0,0,0,0.2);
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .log-card-avatar {
@@ -419,18 +423,39 @@ textarea {
 }
 
 /* Normalize markdown output inside cards */
-.log-body-content p { margin: 0 0 5px; }
-.log-body-content p:last-child { margin-bottom: 0; }
-.log-body-content ul, .log-body-content ol { margin: 5px 0 5px 1.2em; }
-.log-body-content li { margin-bottom: 2px; }
-.log-body-content strong { color: #e2e8f0; font-weight: 700; }
-.log-body-content em { color: #94a3b8; }
+.log-body-content p {
+    margin: 0 0 5px;
+}
+
+.log-body-content p:last-child {
+    margin-bottom: 0;
+}
+
+.log-body-content ul,
+.log-body-content ol {
+    margin: 5px 0 5px 1.2em;
+}
+
+.log-body-content li {
+    margin-bottom: 2px;
+}
+
+.log-body-content strong {
+    color: #e2e8f0;
+    font-weight: 700;
+}
+
+.log-body-content em {
+    color: #94a3b8;
+}
+
 .log-body-content code {
-    background: rgba(0,0,0,0.35);
+    background: rgba(0, 0, 0, 0.35);
     border-radius: 3px;
     padding: 1px 5px;
     font-size: 0.7rem;
 }
+
 .log-body-content pre {
     background: #0d1117;
     border: 1px solid #30363d;
@@ -439,8 +464,15 @@ textarea {
     margin: 8px 0;
     overflow-x: auto;
 }
-.log-body-content pre code { background: none; padding: 0; }
-.log-body-content h1, .log-body-content h2, .log-body-content h3 {
+
+.log-body-content pre code {
+    background: none;
+    padding: 0;
+}
+
+.log-body-content h1,
+.log-body-content h2,
+.log-body-content h3 {
     font-size: 0.75rem;
     font-weight: 700;
     color: #e2e8f0;
@@ -453,7 +485,7 @@ textarea {
     font-style: italic;
     margin-top: 8px;
     padding-top: 7px;
-    border-top: 1px solid rgba(255,255,255,0.04);
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
     font-family: 'Fira Code', monospace;
 }
 
@@ -468,8 +500,8 @@ textarea {
     font-size: 0.63rem;
     color: #4a5568;
     font-family: 'Fira Code', monospace;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     padding: 2px 12px;
 }
@@ -480,7 +512,7 @@ textarea {
     font-family: 'Fira Code', monospace;
     color: #f59e0b;
     border-left: 2px solid #f59e0b55;
-    background: rgba(245,158,11,0.04);
+    background: rgba(245, 158, 11, 0.04);
     border-radius: 0 5px 5px 0;
     padding: 5px 10px;
 }
@@ -494,26 +526,46 @@ textarea {
 
 /* Animations */
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 @keyframes pulse {
-    0% { border-color: var(--border-color); }
-    50% { border-color: var(--accent-primary); }
-    100% { border-color: var(--border-color); }
+    0% {
+        border-color: var(--border-color);
+    }
+
+    50% {
+        border-color: var(--accent-primary);
+    }
+
+    100% {
+        border-color: var(--border-color);
+    }
 }
 
-.pulse { animation: pulse 1.5s infinite; }
-.spin { animation: spin 1s linear infinite; }
+.pulse {
+    animation: pulse 1.5s infinite;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
 
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 4px;
 }
+
 ::-webkit-scrollbar-track {
     background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
     background: #3d3d3d;
     border-radius: 10px;
@@ -532,7 +584,7 @@ textarea {
 }
 
 .repo-sidebar {
-    background: rgba(0,0,0,0.15);
+    background: rgba(0, 0, 0, 0.15);
     padding: 1rem;
     border-right: 1px solid var(--border-color);
     display: flex;
@@ -558,7 +610,7 @@ textarea {
 }
 
 .file-item:hover {
-    background: rgba(255,255,255,0.05);
+    background: rgba(255, 255, 255, 0.05);
     color: var(--text-main);
 }
 
@@ -623,7 +675,7 @@ pre {
 }
 
 .archive-item {
-    background: rgba(0,0,0,0.15);
+    background: rgba(0, 0, 0, 0.15);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: 6px 10px;
@@ -632,7 +684,7 @@ pre {
 }
 
 .archive-item:hover {
-    background: rgba(99,102,241,0.1);
+    background: rgba(99, 102, 241, 0.1);
     border-color: #6366f155;
 }
 
@@ -653,7 +705,7 @@ pre {
 /* Agent-to-Agent conversation entries */
 .log-ask {
     border-left: 2px solid #f59e0b44;
-    background: rgba(245,158,11,0.03);
+    background: rgba(245, 158, 11, 0.03);
 }
 
 /* Agent status badges */
@@ -663,13 +715,106 @@ pre {
     border-radius: 3px;
     font-weight: 700;
     letter-spacing: 0.05em;
-    background: rgba(16,185,129,0.15);
+    background: rgba(16, 185, 129, 0.15);
     color: #10b981;
     display: inline-block;
     margin-top: 3px;
 }
 
 .agent-status.idle {
-    background: rgba(107,114,128,0.15);
+    background: rgba(107, 114, 128, 0.15);
     color: #6b7280;
+}
+
+/* Agent Enable/Disable Toggle */
+.agent-toggle {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+    cursor: pointer;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.agent-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.agent-toggle-slider {
+    position: absolute;
+    inset: 0;
+    background: rgba(107, 114, 128, 0.4);
+    border-radius: 16px;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    left: 2px;
+    bottom: 2px;
+    background: #6b7280;
+    border-radius: 50%;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.agent-toggle input:checked+.agent-toggle-slider {
+    background: rgba(16, 185, 129, 0.35);
+}
+
+.agent-toggle input:checked+.agent-toggle-slider::before {
+    transform: translateX(12px);
+    background: #10b981;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+}
+
+/* Disabled Agent Card */
+.agent-card-disabled {
+    opacity: 0.4;
+    filter: grayscale(0.6);
+    pointer-events: auto;
+}
+
+.agent-card-disabled .agent-toggle {
+    pointer-events: auto;
+}
+
+.agent-card-disabled:hover {
+    opacity: 0.55;
+}
+
+/* Add Agent Card */
+.agent-card-add {
+    border: 1px dashed var(--border-color);
+    background: transparent;
+    cursor: pointer;
+    min-height: 120px;
+    transition: var(--transition);
+}
+
+.agent-card-add:hover {
+    border-color: var(--accent-primary);
+    background: rgba(0, 120, 212, 0.05);
+}
+
+.agent-card-add:hover>div {
+    opacity: 0.85 !important;
+}
+
+/* Delete button for custom agents */
+.agent-delete-btn {
+    opacity: 0.4;
+    transition: all 0.2s;
+}
+
+.agent-delete-btn:hover {
+    opacity: 1;
+    color: #ef4444 !important;
+    border-color: #ef4444 !important;
 }

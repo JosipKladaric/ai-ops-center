@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,10 +8,13 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
+
 <body>
     <div id="app-container">
         <!-- Configuration Sidebar -->
@@ -52,17 +56,21 @@
 
             <div class="input-group">
                 <label>Parameters</label>
-                <div style="background: rgba(0,0,0,0.1); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                <div
+                    style="background: rgba(0,0,0,0.1); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
                         <label style="font-size: 0.7rem; margin:0;">Steps / Sprint</label>
-                        <input type="number" id="step-count" value="4" min="1" max="8" style="width: 50px; text-align: center; padding: 2px 6px; font-size: 0.75rem;">
+                        <input type="number" id="step-count" value="4" min="1" max="8"
+                            style="width: 50px; text-align: center; padding: 2px 6px; font-size: 0.75rem;">
                     </div>
                     <div style="margin-bottom: 0.6rem;">
                         <div style="display: flex; justify-content: space-between;">
                             <label style="font-size: 0.7rem; margin:0;">Temp</label>
                             <span id="temp-val" style="font-size: 0.7rem; color: var(--accent-primary);">0.7</span>
                         </div>
-                        <input type="range" id="llm-temp" min="0" max="1" step="0.1" value="0.7" oninput="document.getElementById('temp-val').innerText = this.value">
+                        <input type="range" id="llm-temp" min="0" max="1" step="0.1" value="0.7"
+                            oninput="document.getElementById('temp-val').innerText = this.value">
                     </div>
                 </div>
             </div>
@@ -76,13 +84,16 @@
                 </button>
             </div>
 
-            <button class="btn btn-secondary" id="reset-session" style="margin-top: 0.5rem; border: 1px dashed #ef444433; color: #ef4444;">
+            <button class="btn btn-secondary" id="reset-session"
+                style="margin-top: 0.5rem; border: 1px dashed #ef444433; color: #ef4444;">
                 <i data-lucide="refresh-ccw" style="width: 14px;"></i> Reset Session
             </button>
 
             <!-- Mission Archive -->
             <div style="margin-top: 1.25rem;">
-                <div style="font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.08em;">Mission Archive</div>
+                <div
+                    style="font-size: 0.65rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; letter-spacing: 0.08em;">
+                    Mission Archive</div>
                 <div id="mission-archive" class="mission-archive"></div>
             </div>
         </aside>
@@ -90,9 +101,12 @@
         <!-- Operation Center -->
         <main class="main-content">
             <!-- Read-Only Banner -->
-            <div id="readonly-banner" style="display:none; background: rgba(99,102,241,0.1); border: 1px solid #6366f155; border-radius: var(--radius-md); padding: 8px 14px; margin-bottom: 1rem; display: none; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.75rem; color: #6366f1;">📁 READ-ONLY — <span id="readonly-title"></span></span>
-                <button onclick="exitReadOnly()" class="btn btn-secondary" style="font-size: 0.65rem; padding: 3px 10px; width: auto;">Exit</button>
+            <div id="readonly-banner"
+                style="display:none; background: rgba(99,102,241,0.1); border: 1px solid #6366f155; border-radius: var(--radius-md); padding: 8px 14px; margin-bottom: 1rem; display: none; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.75rem; color: #6366f1;">📁 READ-ONLY — <span
+                        id="readonly-title"></span></span>
+                <button onclick="exitReadOnly()" class="btn btn-secondary"
+                    style="font-size: 0.65rem; padding: 3px 10px; width: auto;">Exit</button>
             </div>
 
             <header style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
@@ -101,22 +115,30 @@
             </header>
 
             <!-- Status Banner -->
-            <div id="status-banner" style="display:none; border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: 1rem; font-size: 0.8rem; font-weight: 600; border: 1px solid;"></div>
+            <div id="status-banner"
+                style="display:none; border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: 1rem; font-size: 0.8rem; font-weight: 600; border: 1px solid;">
+            </div>
 
             <div id="team-grid" class="agent-grid"></div>
 
             <section style="margin-top: auto; padding-top: 2rem;">
-                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem;">Mission Pipeline</div>
+                <div
+                    style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem;">
+                    Mission Pipeline</div>
                 <div id="pipeline-stepper" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
-                <div id="pipeline-status" style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); font-family: 'Fira Code', monospace;">Ready...</div>
+                <div id="pipeline-status"
+                    style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); font-family: 'Fira Code', monospace;">
+                    Ready...</div>
             </section>
         </main>
 
         <!-- Developer Console -->
         <aside class="sidebar right-sidebar">
-            <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+            <div
+                style="display: flex; gap: 1rem; margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
                 <button class="tab-btn active" data-tab="activity">Activity</button>
-                <button class="tab-btn" data-tab="repo">Repository <span id="workspace-badge" style="width: 6px; height: 6px; background: var(--accent-primary); border-radius: 50%; display: none; margin-left: 4px; vertical-align: middle;"></span></button>
+                <button class="tab-btn" data-tab="repo">Repository <span id="workspace-badge"
+                        style="width: 6px; height: 6px; background: var(--accent-primary); border-radius: 50%; display: none; margin-left: 4px; vertical-align: middle;"></span></button>
             </div>
 
             <div id="activity-tab" class="console-tab active">
@@ -127,14 +149,16 @@
                 <div class="repo-container">
                     <div class="repo-sidebar">
                         <div id="file-tree" class="file-tree"></div>
-                        <button class="btn btn-secondary" id="download-btn" style="width: 100%; margin-top: 1rem; font-size: 0.6rem;">
+                        <button class="btn btn-secondary" id="download-btn"
+                            style="width: 100%; margin-top: 1rem; font-size: 0.6rem;">
                             <i data-lucide="download" style="width: 12px;"></i> Download
                         </button>
                     </div>
                     <div class="repo-viewer">
                         <div class="repo-header">
                             <i data-lucide="file-code" style="width: 14px; color: var(--accent-primary);"></i>
-                            <span id="active-filename" style="font-family: 'Fira Code', monospace; font-size: 0.7rem;">Select a file...</span>
+                            <span id="active-filename"
+                                style="font-family: 'Fira Code', monospace; font-size: 0.7rem;">Select a file...</span>
                         </div>
                         <div id="code-display" class="code-display">
                             <pre><code id="code-content"></code></pre>
@@ -146,14 +170,18 @@
     </div>
 
     <!-- Prompt Editor Modal -->
-    <div id="prompt-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);">
-        <div style="background: var(--card-bg); width: 90%; max-width: 520px; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.6);">
+    <div id="prompt-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);">
+        <div
+            style="background: var(--card-bg); width: 90%; max-width: 520px; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.6);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                 <h3 id="modal-agent-name">Edit Agent Brain</h3>
-                <button id="close-modal" style="border:none; background:transparent; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">&times;</button>
+                <button id="close-modal"
+                    style="border:none; background:transparent; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">&times;</button>
             </div>
             <label style="font-size: 0.75rem; color: var(--text-muted);">System Prompt</label>
-            <textarea id="modal-prompt-text" style="height: 260px; margin-top: 0.5rem; width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:0.75rem; font-family: 'Fira Code', monospace; font-size: 0.75rem; border-radius: var(--radius-md);"></textarea>
+            <textarea id="modal-prompt-text"
+                style="height: 260px; margin-top: 0.5rem; width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:0.75rem; font-family: 'Fira Code', monospace; font-size: 0.75rem; border-radius: var(--radius-md);"></textarea>
             <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
                 <button class="btn" id="save-prompt" style="flex: 1;">Save Changes</button>
             </div>
@@ -162,5 +190,44 @@
 
     <script src="app.js"></script>
     <script>lucide.createIcons();</script>
+
+    <!-- Add Agent Modal -->
+    <div id="add-agent-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1001; align-items: center; justify-content: center; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);">
+        <div
+            style="background: var(--card-bg); width: 90%; max-width: 520px; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.6);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="display:flex; align-items:center; gap:0.5rem;"><span
+                        style="color:var(--accent-primary);">+</span> New Agent</h3>
+                <button onclick="document.getElementById('add-agent-modal').style.display='none'"
+                    style="border:none; background:transparent; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <div class="input-group" style="margin-bottom: 0.75rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Name *</label>
+                <input type="text" id="new-agent-name" placeholder="e.g. Aria" style="margin-top:0.25rem;">
+            </div>
+            <div style="display:flex; gap:0.75rem; margin-bottom: 0.75rem;">
+                <div class="input-group" style="flex:1; margin-bottom:0;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted);">Role</label>
+                    <input type="text" id="new-agent-role" placeholder="e.g. DevOps Engineer"
+                        style="margin-top:0.25rem;">
+                </div>
+                <div class="input-group" style="flex:1; margin-bottom:0;">
+                    <label style="font-size: 0.75rem; color: var(--text-muted);">Description</label>
+                    <input type="text" id="new-agent-desc" placeholder="e.g. Handles CI/CD" style="margin-top:0.25rem;">
+                </div>
+            </div>
+            <label style="font-size: 0.75rem; color: var(--text-muted);">System Prompt *</label>
+            <textarea id="new-agent-prompt" placeholder="Describe the agent's personality, expertise, and behavior..."
+                style="height: 200px; margin-top: 0.5rem; width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:0.75rem; font-family: 'Fira Code', monospace; font-size: 0.75rem; border-radius: var(--radius-md);"></textarea>
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                <button class="btn" onclick="saveNewAgent()" style="flex: 1;">Create Agent</button>
+                <button class="btn btn-secondary"
+                    onclick="document.getElementById('add-agent-modal').style.display='none'"
+                    style="flex: 0.5;">Cancel</button>
+            </div>
+        </div>
+    </div>
 </body>
+
 </html>

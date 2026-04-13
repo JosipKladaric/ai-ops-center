@@ -16,41 +16,44 @@ RESPOND WITH ONLY VALID JSON. All fields required:
 write_file for NEW files only. edit_file to extend an existing file. Always set status and message.`;
 
 // Agent Roster
+const CUSTOM_AGENT_COLORS = ['#06b6d4', '#a855f7', '#f43f5e', '#84cc16', '#e879f9', '#fb923c', '#22d3ee', '#facc15'];
+let nextCustomColorIdx = 0;
+
 const agents = [
     {
         id: 'team-leader', name: 'Alex', role: 'Team Leader', icon: 'users',
         systemPrompt: `You are Alex, the Project Architect. Plan steps, delegate to your team, and evaluate outcomes.${JSON_SCHEMA}`,
-        history: [], color: '#6366f1', desc: 'Plans sprints & evaluates outcomes.'
+        history: [], color: '#6366f1', desc: 'Plans sprints & evaluates outcomes.', enabled: true, builtIn: true
     },
     {
         id: 'programmer', name: 'Codey', role: 'Lead Programmer', icon: 'code',
         systemPrompt: `You are Codey, Lead Programmer. Write complete working code. Use write_file for new source files, edit_file to add to existing ones.${JSON_SCHEMA}`,
-        history: [], color: '#10b981', desc: 'Writes complete working code.'
+        history: [], color: '#10b981', desc: 'Writes complete working code.', enabled: true, builtIn: true
     },
     {
         id: 'designer', name: 'Vidia', role: 'UI Designer', icon: 'palette',
         systemPrompt: `You are Vidia, UI Designer. Create layouts, CSS, UX flows. write_file for new files, edit_file to extend teammates' files.${JSON_SCHEMA}`,
-        history: [], color: '#f59e0b', desc: 'Designs UI layouts and styles.'
+        history: [], color: '#f59e0b', desc: 'Designs UI layouts and styles.', enabled: true, builtIn: true
     },
     {
         id: 'tester', name: 'Buster', role: 'Quality Tester', icon: 'shield-check',
         systemPrompt: `You are Buster, Quality Tester. Review code and design. Set status=needs_review if issues found.${JSON_SCHEMA}`,
-        history: [], color: '#ef4444', desc: 'Audits quality and flags issues.'
+        history: [], color: '#ef4444', desc: 'Audits quality and flags issues.', enabled: true, builtIn: true
     },
     {
         id: 'psychologist', name: 'Sigmund', role: 'UX Psychologist', icon: 'brain',
         systemPrompt: `You are Sigmund, UX Psychologist. Apply cognitive principles: visual hierarchy, Fitts law, Gestalt. Be specific and concise.${JSON_SCHEMA}`,
-        history: [], color: '#fbbf24', desc: 'Applies psychology to UX decisions.'
+        history: [], color: '#fbbf24', desc: 'Applies psychology to UX decisions.', enabled: true, builtIn: true
     },
     {
         id: 'analyst', name: 'Ana', role: 'Data Analyst', icon: 'bar-chart-2',
         systemPrompt: `You are Ana, Data Analyst. Research, data structures, algorithms, math.${JSON_SCHEMA}`,
-        history: [], color: '#8b5cf6', desc: 'Research and data modeling.'
+        history: [], color: '#8b5cf6', desc: 'Research and data modeling.', enabled: true, builtIn: true
     },
     {
         id: 'copywriter', name: 'Pen', role: 'Copywriter', icon: 'edit-3',
         systemPrompt: `You are Pen, Copywriter. Write READMEs, docstrings, user-facing text. write_file for new docs, edit_file to extend.${JSON_SCHEMA}`,
-        history: [], color: '#ec4899', desc: 'Docs, READMEs, and copy.'
+        history: [], color: '#ec4899', desc: 'Docs, READMEs, and copy.', enabled: true, builtIn: true
     }
 ];
 
@@ -78,8 +81,14 @@ function init() {
 // Render Agents
 function renderAgents() {
     const grid = document.getElementById('team-grid');
-    grid.innerHTML = agents.map(agent => `
-        <div class="agent-card" id="card-${agent.id}">
+    grid.innerHTML = agents.map(agent => {
+        const disabledClass = agent.enabled ? '' : ' agent-card-disabled';
+        const deleteBtn = agent.builtIn ? '' : `
+            <button class="btn-icon agent-delete-btn" style="width:22px;height:22px;" onclick="event.stopPropagation(); deleteAgent('${agent.id}')" title="Remove agent">
+                <i data-lucide="trash-2" style="width:10px;"></i>
+            </button>`;
+        return `
+        <div class="agent-card${disabledClass}" id="card-${agent.id}">
             <div class="agent-header">
                 <div class="agent-icon" style="border-bottom: 2px solid ${agent.color};">
                     <i data-lucide="${agent.icon}"></i>
@@ -87,18 +96,76 @@ function renderAgents() {
                 <div style="flex-grow:1;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span class="agent-role">${agent.role}</span>
-                        <button class="btn-icon" style="width:22px;height:22px;" onclick="openPromptEditor('${agent.id}')">
-                            <i data-lucide="edit" style="width:10px;"></i>
-                        </button>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <label class="agent-toggle" title="${agent.enabled ? 'Disable' : 'Enable'} agent">
+                                <input type="checkbox" ${agent.enabled ? 'checked' : ''} onchange="toggleAgent('${agent.id}', this.checked)">
+                                <span class="agent-toggle-slider"></span>
+                            </label>
+                            <button class="btn-icon" style="width:22px;height:22px;" onclick="openPromptEditor('${agent.id}')" title="Edit system prompt">
+                                <i data-lucide="edit" style="width:10px;"></i>
+                            </button>
+                            ${deleteBtn}
+                        </div>
                     </div>
                     <span class="agent-status idle" id="status-${agent.id}">IDLE</span>
                 </div>
             </div>
             <div style="font-weight:600; font-size:0.9rem; margin-bottom:0.2rem; color:${agent.color};">${agent.name}</div>
             <p class="agent-desc">${agent.desc}</p>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('') + `
+        <div class="agent-card agent-card-add" id="add-agent-card" onclick="openAddAgentModal()">
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:0.5rem; opacity:0.5;">
+                <i data-lucide="plus-circle" style="width:32px; height:32px; color:var(--accent-primary)"></i>
+                <span style="font-size:0.75rem; color:var(--text-muted); font-weight:500;">Add Agent</span>
+            </div>
+        </div>`;
     lucide.createIcons();
+}
+
+function toggleAgent(agentId, enabled) {
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent) return;
+    agent.enabled = enabled;
+    renderAgents();
+    saveSession();
+}
+
+function deleteAgent(agentId) {
+    const agent = agents.find(a => a.id === agentId);
+    if (!agent || agent.builtIn) return;
+    if (!confirm(`Remove agent "${agent.name}"?`)) return;
+    const idx = agents.findIndex(a => a.id === agentId);
+    if (idx !== -1) agents.splice(idx, 1);
+    renderAgents();
+    saveSession();
+}
+
+function openAddAgentModal() {
+    document.getElementById('new-agent-name').value = '';
+    document.getElementById('new-agent-role').value = '';
+    document.getElementById('new-agent-desc').value = '';
+    document.getElementById('new-agent-prompt').value = '';
+    document.getElementById('add-agent-modal').style.display = 'flex';
+}
+
+function saveNewAgent() {
+    const name = document.getElementById('new-agent-name').value.trim();
+    const role = document.getElementById('new-agent-role').value.trim();
+    const desc = document.getElementById('new-agent-desc').value.trim();
+    const prompt = document.getElementById('new-agent-prompt').value.trim();
+    if (!name || !prompt) { alert('Name and System Prompt are required.'); return; }
+    const id = 'custom-' + name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
+    const color = CUSTOM_AGENT_COLORS[nextCustomColorIdx % CUSTOM_AGENT_COLORS.length];
+    nextCustomColorIdx++;
+    agents.push({
+        id, name, role: role || 'Custom Agent', icon: 'bot',
+        systemPrompt: prompt + JSON_SCHEMA,
+        history: [], color, desc: desc || 'Custom agent.', enabled: true, builtIn: false
+    });
+    document.getElementById('add-agent-modal').style.display = 'none';
+    renderAgents();
+    saveSession();
 }
 
 function openPromptEditor(agentId) {
@@ -159,7 +226,7 @@ function setupEventListeners() {
         try {
             activeDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
             document.getElementById('project-folder').value = activeDirectoryHandle.name;
-        } catch {}
+        } catch { }
     });
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -187,7 +254,12 @@ function setupEventListeners() {
 // Session Persistence
 function saveSession() {
     const data = {
-        agentData: agents.map(a => ({ id: a.id, history: a.history, prompt: a.systemPrompt })),
+        agentData: agents.map(a => ({
+            id: a.id, history: a.history, prompt: a.systemPrompt,
+            enabled: a.enabled, builtIn: a.builtIn,
+            // persist custom agent metadata
+            ...(a.builtIn ? {} : { name: a.name, role: a.role, icon: a.icon, color: a.color, desc: a.desc })
+        })),
         projectFiles, fileMetadata, logEntries,
         missionScope: document.getElementById('project-description').value,
         serverIp: document.getElementById('server-ip').value,
@@ -213,11 +285,22 @@ function loadSession() {
                 if (agent) {
                     agent.history = d.history || [];
                     agent.systemPrompt = d.prompt || agent.systemPrompt;
+                    if (typeof d.enabled === 'boolean') agent.enabled = d.enabled;
+                } else if (d.builtIn === false && d.name) {
+                    // Re-create custom agent from saved data
+                    agents.push({
+                        id: d.id, name: d.name, role: d.role || 'Custom Agent',
+                        icon: d.icon || 'bot', systemPrompt: d.prompt || '',
+                        history: d.history || [], color: d.color || '#06b6d4',
+                        desc: d.desc || 'Custom agent.',
+                        enabled: typeof d.enabled === 'boolean' ? d.enabled : true,
+                        builtIn: false
+                    });
                 }
             });
         }
         logEntries.forEach(e => renderLogEntry(e.agent, e.msg, e.type, e.time, true));
-    } catch {}
+    } catch { }
 }
 
 // Mission Archive
@@ -358,23 +441,23 @@ function renderLogEntry(agentName, message, type, time, isReplay) {
         const role = agentObj ? agentObj.role : agentName;
         div.innerHTML =
             '<div class="log-card-header">' +
-                '<div class="log-card-avatar" style="background:' + color + '18; border-color:' + color + '55; color:' + color + '">' +
-                    '<i data-lucide="' + icon + '" style="width:11px;height:11px"></i>' +
-                '</div>' +
-                '<div class="log-card-meta">' +
-                    '<span class="log-card-name" style="color:' + color + '">' + agentName.toUpperCase() + '</span>' +
-                    '<span class="log-card-role">' + role + '</span>' +
-                    '<span class="log-card-badge-slot"></span>' +
-                '</div>' +
-                '<span class="log-card-time">' + time + '</span>' +
+            '<div class="log-card-avatar" style="background:' + color + '18; border-color:' + color + '55; color:' + color + '">' +
+            '<i data-lucide="' + icon + '" style="width:11px;height:11px"></i>' +
+            '</div>' +
+            '<div class="log-card-meta">' +
+            '<span class="log-card-name" style="color:' + color + '">' + agentName.toUpperCase() + '</span>' +
+            '<span class="log-card-role">' + role + '</span>' +
+            '<span class="log-card-badge-slot"></span>' +
+            '</div>' +
+            '<span class="log-card-time">' + time + '</span>' +
             '</div>' +
             '<div class="log-card-body">' +
-                '<div class="log-body-content">' + marked.parse(safeMsg) + '</div>' +
+            '<div class="log-body-content">' + marked.parse(safeMsg) + '</div>' +
             '</div>';
     }
 
     logFeed.prepend(div);
-    if (!isReplay) setTimeout(function() { lucide.createIcons(); }, 0);
+    if (!isReplay) setTimeout(function () { lucide.createIcons(); }, 0);
     return div;
 }
 
@@ -417,13 +500,13 @@ async function commitFile(filename, content, authorName, mode) {
             const w = await h.createWritable();
             await w.write(projectFiles[filename]);
             await w.close();
-        } catch (err) {}
+        } catch (err) { }
     }
 }
 
 // Pipeline Stepper
 function renderStepper(steps, currentIdx) {
-    document.getElementById('pipeline-stepper').innerHTML = steps.map(function(_, i) {
+    document.getElementById('pipeline-stepper').innerHTML = steps.map(function (_, i) {
         var cls = i < currentIdx ? 'completed' : (i === currentIdx ? 'active' : '');
         return '<div class="stepper-item ' + cls + '">' + (i + 1) + '</div>';
     }).join('');
@@ -477,7 +560,7 @@ async function callLLM(agent, userPrompt, onChunk) {
                     fullContent += j.message.content;
                     if (onChunk) onChunk(fullContent);
                 }
-            } catch (e) {}
+            } catch (e) { }
         }
         if (!isMissionRunning) { reader.cancel(); break; }
     }
@@ -491,7 +574,7 @@ async function callLLM(agent, userPrompt, onChunk) {
     } catch (e) {
         const match = fullContent.match(/\{[\s\S]*\}/);
         if (match) {
-            try { return JSON.parse(match[0]); } catch (e2) {}
+            try { return JSON.parse(match[0]); } catch (e2) { }
         }
         return { action: 'suggest', status: 'complete', message: fullContent, thoughts: '' };
     }
@@ -515,7 +598,7 @@ async function runAgentTurn(agentId, prompt, statusMsg) {
     try {
         logRef = addLog(agent.name, '\u258c', 'agent');
 
-        const parsed = await callLLM(agent, prompt, function(raw) {
+        const parsed = await callLLM(agent, prompt, function (raw) {
             const cursor = logRef.querySelector('.log-body-content');
             if (!cursor) return;
             cursor.innerHTML = marked.parse(extractStreamMessage(raw) + ' \u258c');
@@ -590,18 +673,18 @@ async function runSprint(steps, roster, planText, mission, sprintNum) {
         addLog('System', 'Sprint ' + sprintNum + ' - Step ' + (idx + 1) + ': routing...', 'system');
 
         const routeLogRef = addLog('Orchestrator', '\u258c', 'agent');
-        const getRouteBody = function() { return routeLogRef.querySelector('.log-body-content'); };
+        const getRouteBody = function () { return routeLogRef.querySelector('.log-body-content'); };
 
         const route = await callLLM(leaderAgent,
             'Which agent ID best handles: "' + step + '"?\nRoster:\n' + roster + '\nJSON: {"agent_id":"id","thoughts":"why","action":"suggest","status":"complete","message":"id"}',
-            function(raw) {
+            function (raw) {
                 const el = getRouteBody();
                 if (el) el.innerHTML = marked.parse(extractStreamMessage(raw) + ' \u258c');
             }
         );
 
         const rawId = ((route && (route.agent_id || route.message)) || 'programmer').toLowerCase().trim().replace(/[^a-z-]/g, '');
-        const agent = agents.find(a => a.id === rawId) || agents.find(a => a.id === 'programmer');
+        const agent = agents.find(a => a.id === rawId && a.enabled) || agents.find(a => a.id === 'programmer' && a.enabled) || agents.find(a => a.enabled && a.id !== 'team-leader');
 
         const rb = getRouteBody();
         if (rb) rb.innerHTML = 'Assigned to <strong style="color:' + agent.color + '">' + agent.name + '</strong> (' + agent.role + ')';
@@ -648,7 +731,8 @@ async function startMissionCycle(mission) {
     document.getElementById('status-banner').style.display = 'none';
 
     const stepCount = Math.max(1, Math.min(8, parseInt(document.getElementById('step-count').value) || 4));
-    const roster = agents.map(a => a.id + ': ' + a.role + ' - ' + a.desc).join('\n');
+    const enabledAgents = agents.filter(a => a.enabled);
+    const roster = enabledAgents.map(a => a.id + ': ' + a.role + ' - ' + a.desc).join('\n');
 
     addLog('System', 'Mission started - ' + stepCount + ' steps/sprint', 'system');
 
@@ -658,7 +742,8 @@ async function startMissionCycle(mission) {
 
 Fill the "steps" array with EXACTLY ${stepCount} development steps.
 Each step: "Step N: [concrete task] - Assign to: [Name]"
-Names available: Codey, Vidia, Buster, Ana, Pen, Sigmund.
+ONLY use agents from this roster (others are disabled):
+Names available: ${enabledAgents.filter(a => a.id !== 'team-leader').map(a => a.name).join(', ')}.
 Set action=suggest, status=complete, message="Plan ready".`,
             'Planning sprint 1...'
         );
@@ -747,3 +832,7 @@ window.selectFile = selectFile;
 window.openPromptEditor = openPromptEditor;
 window.exitReadOnly = exitReadOnly;
 window.loadArchiveMission = loadArchiveMission;
+window.toggleAgent = toggleAgent;
+window.deleteAgent = deleteAgent;
+window.openAddAgentModal = openAddAgentModal;
+window.saveNewAgent = saveNewAgent;
