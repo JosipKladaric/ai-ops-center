@@ -530,7 +530,7 @@ async function callLLM(agent, userPrompt, onChunk) {
             format: 'json',
             options: {
                 temperature: parseFloat(document.getElementById('llm-temp').value) || 0.7,
-                num_ctx: 4096
+                num_ctx: 16384
             },
             stream: true
         })
