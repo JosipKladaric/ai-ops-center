@@ -70,6 +70,8 @@ body {
 .right-sidebar {
     border-right: none;
     border-left: 1px solid var(--border-color);
+    overflow-y: hidden;
+    height: 100vh;
 }
 
 .panel-title {
@@ -328,7 +330,13 @@ textarea {
     gap: 6px;
     padding: 4px 0;
     overflow-y: auto;
-    flex-grow: 1;
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: 100%;
+}
+
+#log-feed > * {
+    flex-shrink: 0;
 }
 
 /* Agent card */
@@ -489,6 +497,64 @@ textarea {
     font-family: 'Fira Code', monospace;
 }
 
+/* Thinking / Reasoning block */
+.log-thinking-block {
+    margin-bottom: 10px;
+    border-left: 2px solid rgba(139, 92, 246, 0.3);
+    border-radius: 0 6px 6px 0;
+    background: rgba(139, 92, 246, 0.04);
+}
+
+.log-thinking-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #a78bfa;
+    cursor: pointer;
+    padding: 6px 10px;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s;
+}
+
+.log-thinking-label:hover {
+    background: rgba(139, 92, 246, 0.08);
+}
+
+.log-thinking-label::marker {
+    color: #a78bfa;
+    font-size: 0.6rem;
+}
+
+.log-thinking-content {
+    padding: 8px 12px;
+    font-size: 0.7rem;
+    font-family: 'Fira Code', monospace;
+    line-height: 1.6;
+    color: #94a3b8;
+    background: rgba(0, 0, 0, 0.2);
+    max-height: 250px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: block;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+    transition: max-height 0.3s ease;
+}
+
+.log-thinking-content.is-streaming {
+    max-height: none !important;
+}
+
+.log-thinking-content p {
+    margin: 0 0 4px;
+}
+
+.log-thinking-content p:last-child {
+    margin-bottom: 0;
+}
+
 /* System pill */
 .log-system {
     display: flex;
@@ -575,12 +641,13 @@ textarea {
 .repo-container {
     display: grid;
     grid-template-columns: 240px 1fr;
-    height: 600px;
+    flex: 1;
+    min-height: 0;
     background: var(--card-bg);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
     overflow: hidden;
-    margin-top: 1rem;
+    margin-top: 0.5rem;
 }
 
 .repo-sidebar {
@@ -624,6 +691,8 @@ textarea {
     display: flex;
     flex-direction: column;
     background: #0d1117;
+    min-width: 0;
+    min-height: 0;
 }
 
 .repo-header {
@@ -658,7 +727,9 @@ pre {
 .console-tab {
     display: none;
     flex-direction: column;
-    height: calc(100% - 60px);
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .console-tab.active {

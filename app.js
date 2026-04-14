@@ -2,18 +2,18 @@
 
 // JSON schema - compact to save context window tokens
 const JSON_SCHEMA = `
-RESPOND WITH ONLY VALID JSON. All fields required:
+TEMPLATE (REQUIRED):
 {
-  "thoughts": "brief reasoning",
-  "action": "write_file | edit_file | suggest | review | ask",
-  "filename": "file.ext (write_file/edit_file only)",
-  "content": "write_file=full file. edit_file=new section to append only.",
-  "steps": ["Step 1: ...", "Step 2: ..."],
-  "status": "complete | needs_review | blocked",
-  "message": "short summary of what you did (1-2 sentences)",
+  "logic": "1-sentence decision",
+  "action": "write_file | edit_file | suggest",
+  "filename": "relative/path.ext",
+  "content": "raw code or text",
+  "status": "complete | needs_review",
+  "message": "Succinct action summary.",
+  "steps": ["Step 1...", "Step 2..."],
   "ask": { "to": "agent-id", "question": "..." }
-}
-write_file for NEW files only. edit_file to extend an existing file. Always set status and message.`;
+}`;
+const BASE_SYSTEM_PROMPT = `Output the TEMPLATE JSON immediately. No preamble. No meta-thinking.`;
 
 // Agent Roster
 const CUSTOM_AGENT_COLORS = ['#06b6d4', '#a855f7', '#f43f5e', '#84cc16', '#e879f9', '#fb923c', '#22d3ee', '#facc15'];
@@ -22,7 +22,7 @@ let nextCustomColorIdx = 0;
 const agents = [
     {
         id: 'team-leader', name: 'Alex', role: 'Team Leader', icon: 'users',
-        systemPrompt: `You are Alex, the Project Architect. Plan steps, delegate to your team, and evaluate outcomes.${JSON_SCHEMA}`,
+        systemPrompt: `You are Alex, the Project Orchestrator. Your role is to plan, delegate, and evaluate. Be decisive and extremely concise. Focus only on the delta between the current state and the mission goal.${JSON_SCHEMA}`,
         history: [], color: '#6366f1', desc: 'Plans sprints & evaluates outcomes.', enabled: true, builtIn: true
     },
     {
@@ -56,6 +56,10 @@ const agents = [
         history: [], color: '#ec4899', desc: 'Docs, READMEs, and copy.', enabled: true, builtIn: true
     }
 ];
+
+// Store default system prompts for reset
+const DEFAULT_PROMPTS = {};
+agents.forEach(a => { DEFAULT_PROMPTS[a.id] = a.systemPrompt; });
 
 // State
 let projectFiles = {};
@@ -202,13 +206,41 @@ function setupEventListeners() {
 
     document.getElementById('reset-session').addEventListener('click', () => {
         if (!confirm('Clear current session data?')) return;
+        
+        // Reset state
         projectFiles = {};
         fileMetadata = {};
         logEntries = [];
-        agents.forEach(a => { a.history = []; });
+        sprintStatuses = [];
+        activeFilename = null;
+        
+        // Reset Agents
+        for (let i = agents.length - 1; i >= 0; i--) {
+            if (!agents[i].builtIn) {
+                agents.splice(i, 1);
+            } else {
+                agents[i].history = [];
+                agents[i].enabled = true;
+                if (DEFAULT_PROMPTS[agents[i].id]) {
+                    agents[i].systemPrompt = DEFAULT_PROMPTS[agents[i].id];
+                }
+            }
+        }
+        
+        // Reset UI Components
         document.getElementById('log-feed').innerHTML = '';
-        renderFileTree();
+        document.getElementById('pipeline-stepper').innerHTML = '';
+        document.getElementById('pipeline-status').innerText = 'Ready...';
         document.getElementById('status-banner').style.display = 'none';
+        
+        // Clear Code View
+        const fnDisplay = document.getElementById('active-filename');
+        const codeDisplay = document.getElementById('code-content');
+        if (fnDisplay) fnDisplay.innerText = 'Select a file...';
+        if (codeDisplay) codeDisplay.innerText = '';
+        
+        renderAgents();
+        renderFileTree();
         saveSession();
     });
 
@@ -248,6 +280,30 @@ function setupEventListeners() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a'); a.href = url; a.download = activeFilename; a.click();
         URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('download-project-btn').addEventListener('click', async () => {
+        const fileNames = Object.keys(projectFiles);
+        if (fileNames.length === 0) {
+            alert('No files in repository to download.');
+            return;
+        }
+        try {
+            const zip = new JSZip();
+            fileNames.forEach(name => {
+                zip.file(name, projectFiles[name]);
+            });
+            const content = await zip.generateAsync({ type: 'blob' });
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a'); 
+            a.href = url; 
+            a.download = `project-${Date.now()}.zip`; 
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Zip generation failed:', e);
+            alert('Failed to generate ZIP.');
+        }
     });
 }
 
@@ -524,10 +580,24 @@ async function callLLM(agent, userPrompt, onChunk) {
             model: model,
             messages: [
                 { role: 'system', content: agent.systemPrompt },
-                ...agent.history,
+                ...agent.history.map(m => {
+                    // Sanitize history to prevent loop propagation
+                    if (m.role === 'assistant') {
+                        try {
+                            const parsed = JSON.parse(m.content);
+                            const sanitized = { ...parsed };
+                            delete sanitized.logic;
+                            delete sanitized.thoughts;
+                            delete sanitized._thinking;
+                            return { role: m.role, content: JSON.stringify(sanitized) };
+                        } catch (e) { return m; }
+                    }
+                    return m;
+                }),
                 { role: 'user', content: userPrompt }
             ],
             format: 'json',
+            think: true,
             options: {
                 temperature: parseFloat(document.getElementById('llm-temp').value) || 0.7,
                 num_ctx: 16384
@@ -544,6 +614,7 @@ async function callLLM(agent, userPrompt, onChunk) {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let fullContent = '';
+    let fullThinking = '';
     let lineBuffer = '';
 
     while (true) {
@@ -556,9 +627,10 @@ async function callLLM(agent, userPrompt, onChunk) {
             if (!line.trim()) continue;
             try {
                 const j = JSON.parse(line);
-                if (j.message && j.message.content) {
-                    fullContent += j.message.content;
-                    if (onChunk) onChunk(fullContent);
+                if (j.message) {
+                    if (j.message.thinking) fullThinking += j.message.thinking;
+                    if (j.message.content) fullContent += j.message.content;
+                    if (onChunk) onChunk(fullContent, fullThinking);
                 }
             } catch (e) { }
         }
@@ -570,13 +642,15 @@ async function callLLM(agent, userPrompt, onChunk) {
     if (agent.history.length > 12) agent.history = agent.history.slice(-6);
 
     try {
-        return JSON.parse(fullContent);
+        const result = JSON.parse(fullContent);
+        result._thinking = fullThinking;
+        return result;
     } catch (e) {
         const match = fullContent.match(/\{[\s\S]*\}/);
         if (match) {
-            try { return JSON.parse(match[0]); } catch (e2) { }
+            try { const r = JSON.parse(match[0]); r._thinking = fullThinking; return r; } catch (e2) { }
         }
-        return { action: 'suggest', status: 'complete', message: fullContent, thoughts: '' };
+        return { action: 'suggest', status: 'complete', message: fullContent, thoughts: '', _thinking: fullThinking };
     }
 }
 
@@ -598,17 +672,40 @@ async function runAgentTurn(agentId, prompt, statusMsg) {
     try {
         logRef = addLog(agent.name, '\u258c', 'agent');
 
-        const parsed = await callLLM(agent, prompt, function (raw) {
+        // Reinforce identity so agents don't adopt other agents' personas from plan text
+        const identityPrompt = 'IDENTITY: You are ' + agent.name + ', ' + agent.role + '. Never impersonate another agent.\n\n' + prompt;
+
+        const parsed = await callLLM(agent, identityPrompt, function (content, thinking) {
             const cursor = logRef.querySelector('.log-body-content');
             if (!cursor) return;
-            cursor.innerHTML = marked.parse(extractStreamMessage(raw) + ' \u258c');
+            let html = '';
+            if (thinking) {
+                html += '<details class="log-thinking-block" open>' +
+                    '<summary class="log-thinking-label">\ud83e\udde0 Reasoning</summary>' +
+                    '<div class="log-thinking-content is-streaming">' + marked.parse(thinking) + '</div></details>';
+            }
+            if (content) {
+                html += marked.parse(extractStreamMessage(content) + ' \u258c');
+            } else if (thinking) {
+                html += '<span style="opacity:0.3">\u258c awaiting response...</span>';
+            }
+            cursor.innerHTML = html;
         });
 
         if (!parsed) return null;
 
         if (logRef) {
             const body = logRef.querySelector('.log-body-content');
-            if (body) body.innerHTML = marked.parse(safeStr(parsed.message || '(no message)'));
+            if (body) {
+                let finalHtml = '';
+                if (parsed._thinking) {
+                    finalHtml += '<details class="log-thinking-block">' +
+                        '<summary class="log-thinking-label">\ud83e\udde0 Reasoning</summary>' +
+                        '<div class="log-thinking-content">' + marked.parse(parsed._thinking) + '</div></details>';
+                }
+                finalHtml += marked.parse(safeStr(parsed.message || '(no message)'));
+                body.innerHTML = finalHtml;
+            }
 
             if (parsed.status) {
                 const slot = logRef.querySelector('.log-card-badge-slot');
@@ -620,12 +717,12 @@ async function runAgentTurn(agentId, prompt, statusMsg) {
             }
         }
 
-        if (parsed.thoughts && logRef) {
+        if ((parsed.logic || parsed.thoughts) && logRef) {
             const body = logRef.querySelector('.log-card-body');
             if (body) {
                 const t = document.createElement('div');
                 t.className = 'log-card-thoughts';
-                t.innerText = '\ud83d\udcad ' + safeStr(parsed.thoughts);
+                t.innerText = '\ud83d\udcad ' + safeStr(parsed.logic || parsed.thoughts);
                 body.appendChild(t);
             }
         }
@@ -672,14 +769,22 @@ async function runSprint(steps, roster, planText, mission, sprintNum) {
         renderStepper(steps, idx);
         addLog('System', 'Sprint ' + sprintNum + ' - Step ' + (idx + 1) + ': routing...', 'system');
 
-        const routeLogRef = addLog('Orchestrator', '\u258c', 'agent');
+        const routeLogRef = addLog(leaderAgent.name, '\u258c', 'agent');
         const getRouteBody = function () { return routeLogRef.querySelector('.log-body-content'); };
 
         const route = await callLLM(leaderAgent,
             'Which agent ID best handles: "' + step + '"?\nRoster:\n' + roster + '\nJSON: {"agent_id":"id","thoughts":"why","action":"suggest","status":"complete","message":"id"}',
-            function (raw) {
+            function (content, thinking) {
                 const el = getRouteBody();
-                if (el) el.innerHTML = marked.parse(extractStreamMessage(raw) + ' \u258c');
+                if (!el) return;
+                let html = '';
+                if (thinking) {
+                    html += '<details class="log-thinking-block" open>' +
+                        '<summary class="log-thinking-label">\ud83e\udde0 Reasoning</summary>' +
+                        '<div class="log-thinking-content">' + marked.parse(thinking) + '</div></details>';
+                }
+                html += content ? marked.parse(extractStreamMessage(content) + ' \u258c') : '';
+                el.innerHTML = html;
             }
         );
 
@@ -722,6 +827,8 @@ function showStatusBanner(type, message) {
     banner.style.color = ok ? '#10b981' : '#ef4444';
 }
 
+const MAX_TOTAL_STEPS = 20;
+
 // Mission Lifecycle
 async function startMissionCycle(mission) {
     isMissionRunning = true;
@@ -730,86 +837,100 @@ async function startMissionCycle(mission) {
     document.getElementById('stop-mission').style.display = 'block';
     document.getElementById('status-banner').style.display = 'none';
 
-    const stepCount = Math.max(1, Math.min(8, parseInt(document.getElementById('step-count').value) || 4));
     const enabledAgents = agents.filter(a => a.enabled);
     const roster = enabledAgents.map(a => a.id + ': ' + a.role + ' - ' + a.desc).join('\n');
+    const agentNames = enabledAgents.filter(a => a.id !== 'team-leader').map(a => a.name).join(', ');
 
-    addLog('System', 'Mission started - ' + stepCount + ' steps/sprint', 'system');
+    addLog('System', 'Mission started', 'system');
+    let totalSteps = 0;
+    let sprintNum = 0;
 
     try {
-        const plan = await runAgentTurn('team-leader',
-            `MISSION: "${mission}"
+        while (isMissionRunning && totalSteps < MAX_TOTAL_STEPS) {
+            sprintNum++;
+            const repoSnap = Object.keys(projectFiles).join(', ') || 'empty';
+            const repoContext = repoSnap === 'empty' ? 'Repository is empty.'
+                : 'Current files: ' + repoSnap;
 
-Fill the "steps" array with EXACTLY ${stepCount} development steps.
-Each step: "Step N: [concrete task] - Assign to: [Name]"
-ONLY use agents from this roster (others are disabled):
-Names available: ${enabledAgents.filter(a => a.id !== 'team-leader').map(a => a.name).join(', ')}.
-Set action=suggest, status=complete, message="Plan ready".`,
-            'Planning sprint 1...'
-        );
-        if (!plan || !isMissionRunning) throw new Error('Stopped');
+            // --- PLAN ---
+            addLog('System', 'SPRINT ' + sprintNum + ' — Planning', 'system');
+            const plan = await runAgentTurn('team-leader',
+                `MISSION: "${mission}"
 
-        // Primary: use steps array. Fallback: regex-parse message/thoughts.
-        let steps = [];
-        if (Array.isArray(plan.steps) && plan.steps.length > 0) {
-            steps = plan.steps.map(s => safeStr(s)).filter(s => s.length > 5);
-        } else {
-            const planText = safeStr(plan.message || plan.thoughts || plan.content);
-            steps = planText.split('\n')
-                .map(s => s.trim())
-                .filter(s => s.length > 8 && /(^step\s*\d+|^\d+[.):-]|^[-•*]\s)/i.test(s));
-            if (steps.length === 0)
-                steps = planText.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15);
+${repoContext}
+
+BE BRIEF. Plan the NECESSARY concrete steps to advance.
+Fill the "steps" array. Each step: "Step N: [task]"
+Available agents: ${agentNames}.
+If mission is COMPLETE: set status=complete, steps=[].
+Otherwise: set status=needs_review.`,
+                'Planning sprint ' + sprintNum + '...'
+            );
+            if (!plan || !isMissionRunning) throw new Error('Stopped');
+
+            // Check if leader says we're done
+            if (plan.status === 'complete' && (!Array.isArray(plan.steps) || plan.steps.length === 0)) {
+                addLog('System', 'Team Leader declared mission complete.', 'system');
+                break;
+            }
+
+            // Parse steps
+            let steps = [];
+            if (Array.isArray(plan.steps) && plan.steps.length > 0) {
+                steps = plan.steps.map(s => safeStr(s)).filter(s => s.length > 5);
+            } else {
+                const planText = safeStr(plan.message || plan.thoughts || plan.content);
+                steps = planText.split('\n')
+                    .map(s => s.trim())
+                    .filter(s => s.length > 8 && /(^step\s*\d+|^\d+[.):-]|^[-•*]\s)/i.test(s));
+                if (steps.length === 0)
+                    steps = planText.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15);
+            }
+
+            if (steps.length === 0) {
+                addLog('System', 'No steps generated — ending.', 'system');
+                break;
+            }
+
+            // Cap steps so we don't exceed total limit
+            const remaining = MAX_TOTAL_STEPS - totalSteps;
+            steps = steps.slice(0, remaining);
+
+            const planText = Array.isArray(plan.steps) ? plan.steps.join('\n') :
+                safeStr(plan.message || plan.thoughts || plan.content);
+
+            // --- EXECUTE ---
+            await runSprint(steps, roster, planText, mission, sprintNum);
+            totalSteps += steps.length;
+            if (!isMissionRunning) throw new Error('Stopped');
+
+            // --- EVALUATE ---
+            addLog('System', 'Sprint ' + sprintNum + ' complete — evaluating', 'system');
+            sprintStatuses = [];
+
+            const evaluation = await runAgentTurn('team-leader',
+                `MISSION: "${mission}"
+Repo state: ${Object.keys(projectFiles).join(', ') || 'none'}
+
+BE BRIEF. Is the mission complete?
+- YES: status=complete, steps=[], summarize deliverables in message.
+- NO: status=needs_review, more steps will be planned.`,
+                'Evaluating sprint ' + sprintNum + '...'
+            );
+            if (!isMissionRunning) throw new Error('Stopped');
+
+            if (evaluation && evaluation.status === 'complete') {
+                addLog('System', 'Team Leader declared mission complete.', 'system');
+                break;
+            }
         }
 
-        const planText = Array.isArray(plan.steps) ? plan.steps.join('\n') :
-            safeStr(plan.message || plan.thoughts || plan.content);
-
-        await runSprint(steps, roster, planText, mission, 1);
-        if (!isMissionRunning) throw new Error('Stopped');
-
-        addLog('System', 'ROUNDTABLE MEETING', 'system');
-        const repoSnap = Object.keys(projectFiles).join(', ') || 'none';
-
-        await runAgentTurn('psychologist',
-            'Review "' + mission + '". Files: ' + repoSnap + '. Give 3 specific UX/psych improvements.',
-            'Psych review...'
-        );
-
-        await runAgentTurn('tester',
-            'Review "' + mission + '". Files: ' + repoSnap + '. Flag bugs, missing pieces, risks. Set status=needs_review if improvements needed.',
-            'Quality audit...'
-        );
-
-        const evaluation = await runAgentTurn('team-leader',
-            'Sprint 1 complete. Files: ' + repoSnap + '. Statuses: ' + sprintStatuses.join(', ') + '.\nIs mission complete? If follow-up needed, list up to ' + stepCount + ' more steps starting "Step X:" and set status=needs_review. If done, set status=complete.',
-            'Sprint evaluation...'
-        );
-        if (!isMissionRunning) throw new Error('Stopped');
-
-        const needsFollowUp = evaluation && (evaluation.status === 'needs_review' || sprintStatuses.includes('needs_review') || sprintStatuses.includes('blocked'));
-
-        if (needsFollowUp && isMissionRunning) {
-            addLog('System', 'FOLLOW-UP SPRINT', 'system');
-            sprintStatuses = [];
-            const followUpText = safeStr(evaluation?.message);
-            let followUpSteps = followUpText.split('\n')
-                .map(s => s.trim())
-                .filter(s => s.length > 8 && /(^step\s*\d+|^\d+[.):-]|^[-•*]\s)/i.test(s));
-            if (followUpSteps.length === 0)
-                followUpSteps = followUpText.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15);
-            if (followUpSteps.length > 0) {
-                await runSprint(followUpSteps.slice(0, stepCount), roster, followUpText, mission, 2);
-            }
-            if (isMissionRunning) {
-                addLog('System', 'FINAL ROUNDTABLE', 'system');
-                await runAgentTurn('tester', 'Final review. Files: ' + Object.keys(projectFiles).join(', ') + '. Mission: ' + mission, 'Final audit...');
-                await runAgentTurn('team-leader', 'All sprints complete. Summarize deliverables for "' + mission + '".', 'Final summary...');
-            }
+        if (totalSteps >= MAX_TOTAL_STEPS) {
+            addLog('System', 'Safety cap reached (' + MAX_TOTAL_STEPS + ' steps). Stopping.', 'system');
         }
 
         if (isMissionRunning) {
-            showStatusBanner('complete', 'Mission Complete');
+            showStatusBanner('complete', 'Mission Complete — ' + totalSteps + ' steps executed');
             saveMissionToArchive(mission);
             saveSession();
         }
