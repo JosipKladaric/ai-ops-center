@@ -40,14 +40,19 @@
                 <input type="text" id="llm-model" value="qwen3.5:9b">
             </div>
 
-            <div class="input-group">
-                <label for="project-folder">Workdir</label>
+            <div id="local-project-group" class="input-group" style="display: none;">
+                <label for="project-name">Project Name</label>
                 <div style="display: flex; gap: 0.25rem;">
-                    <input type="text" id="project-folder" readonly placeholder="./">
-                    <button class="btn btn-secondary" style="width: 40px;" id="pick-folder">
-                        <i data-lucide="folder" style="width: 14px;"></i>
-                    </button>
+                    <input type="text" id="project-name" placeholder="e.g. my-awesome-app" oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9-_]/g, '-')">
                 </div>
+            </div>
+
+            <div id="web-folder-group" class="input-group" style="display: none;">
+                <label>Project Workspace</label>
+                <button id="select-folder" class="btn btn-secondary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                    <i data-lucide="folder-open" style="width: 16px;"></i>
+                    Select Project Folder
+                </button>
             </div>
 
             <div class="input-group" style="flex-grow: 1;">
@@ -66,6 +71,10 @@
                         </div>
                         <input type="range" id="llm-temp" min="0" max="1" step="0.1" value="0.7"
                             oninput="document.getElementById('temp-val').innerText = this.value">
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05);">
+                        <label style="font-size: 0.7rem; margin:0;">Reasoning Mode</label>
+                        <input type="checkbox" id="llm-think" checked style="width: 14px; height: 14px; cursor: pointer;">
                     </div>
                 </div>
             </div>
@@ -104,9 +113,17 @@
                     style="font-size: 0.65rem; padding: 3px 10px; width: auto;">Exit</button>
             </div>
 
-            <header style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-                <h1>AI Operation Center</h1>
-                <p style="color: var(--text-muted); font-size: 0.8rem;">Multi-agent collaborative environment.</p>
+            <header style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <h1>AI Operation Center</h1>
+                        <button class="btn-icon" id="edit-comm-rules" title="Communication Rules" style="width: 28px; height: 28px;">
+                            <i data-lucide="message-square-quote" style="width: 14px;"></i>
+                        </button>
+                        <div id="local-engine-pill" style="display:none; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b98155; color: #10b981; font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.05em;">LOCAL ENGINE</div>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">Multi-agent collaborative environment.</p>
+                </div>
             </header>
 
             <!-- Status Banner -->
@@ -183,6 +200,28 @@
                 style="height: 260px; margin-top: 0.5rem; width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:0.75rem; font-family: 'Fira Code', monospace; font-size: 0.75rem; border-radius: var(--radius-md);"></textarea>
             <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
                 <button class="btn" id="save-prompt" style="flex: 1;">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Communication Rules Modal -->
+    <div id="comm-rules-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);">
+        <div
+            style="background: var(--card-bg); width: 90%; max-width: 520px; padding: 1.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); box-shadow: 0 20px 60px rgba(0,0,0,0.6);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="message-square-quote" style="width: 20px; color: var(--accent-primary);"></i> Communication Rules</h3>
+                <button id="close-comm-rules"
+                    style="border:none; background:transparent; color:var(--text-muted); font-size:1.5rem; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <div style="margin-bottom: 1rem; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4;">
+                These rules are automatically appended to every agent's system prompt. Use this to define global behavior, tone, or formatting rules.
+            </div>
+            <textarea id="comm-rules-text" placeholder="e.g. Always be professional. Use emojis sparingly. Mention the file name in every message..."
+                style="height: 260px; width:100%; background:rgba(0,0,0,0.3); border:1px solid var(--border-color); color:white; padding:0.75rem; font-family: 'Fira Code', monospace; font-size: 0.75rem; border-radius: var(--radius-md);"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+                <button class="btn btn-secondary" id="reset-comm-rules">Reset to Default</button>
+                <button class="btn btn-primary" id="save-comm-rules">Save Rules</button>
             </div>
         </div>
     </div>

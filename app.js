@@ -5,15 +5,55 @@ const JSON_SCHEMA = `
 TEMPLATE (REQUIRED):
 {
   "logic": "1-sentence decision",
-  "action": "write_file | edit_file | suggest",
-  "filename": "relative/path.ext",
-  "content": "raw code or text",
+  "actions": [
+    { "type": "write_file", "filename": "path.ext", "content": "..." },
+    { "type": "read_file", "filename": "path.ext" },
+    { "type": "edit_file", "filename": "path.ext", "search": "...", "replace": "..." },
+    { "type": "insert_after", "filename": "path.ext", "search": "...", "content": "..." },
+    { "type": "run_command", "command": "..." }
+  ],
   "status": "complete | needs_review",
-  "message": "Succinct action summary.",
-  "steps": ["Step 1...", "Step 2..."],
+  "message": "Succinct summary of all actions.",
   "ask": { "to": "agent-id", "question": "..." }
 }`;
 const BASE_SYSTEM_PROMPT = `Output the TEMPLATE JSON immediately. No preamble. No meta-thinking.`;
+let communicationRules = JSON_SCHEMA + `
+
+COMMUNICATION RULES:
+1. READ BEFORE EDIT: Always 'read_file' first to get exact content.
+2. NO SHELL READING: Never use shell commands (cat, type, ls) to read files. Use 'read_file' instead.
+3. Windows Environment: You are on Windows. Use 'dir' instead of 'ls' if you must list, but 'read_file' is always better.
+4. Chain multiple actions in the 'actions' array.
+5. For edit/insert, 'search' MUST match EXACTLY.
+6. run_command: Use this to verify your code or set up environments.
+7. If turn continues, set status='needs_review'. Avoid 'suggest' action, use 'logic' instead.
+
+EXAMPLE (MULTI-ACTION):
+{
+  "logic": "Writing classes and verifying.",
+  "actions": [
+    { "type": "write_file", "filename": "math.py", "content": "def add(a,b): return a+b" },
+    { "type": "run_command", "command": "python math.py" }
+  ],
+  "status": "complete",
+  "message": "Done."
+}
+
+EXAMPLE (INSERT):
+{
+  "action": "insert_after",
+  "filename": "app.js",
+  "search": "import sys",
+  "content": "\\nimport os"
+}
+
+EXAMPLE (REPLACE):
+{
+  "action": "edit_file",
+  "filename": "app.js",
+  "search": "old_code",
+  "replace": "new_code"
+}`;
 
 // Agent Roster
 const CUSTOM_AGENT_COLORS = ['#06b6d4', '#a855f7', '#f43f5e', '#84cc16', '#e879f9', '#fb923c', '#22d3ee', '#facc15'];
@@ -22,37 +62,37 @@ let nextCustomColorIdx = 0;
 const agents = [
     {
         id: 'team-leader', name: 'Alex', role: 'Team Leader', icon: 'users',
-        systemPrompt: `You are Alex, the Project Orchestrator. Your role is to plan, delegate, and evaluate. Be decisive and extremely concise. Focus only on the delta between the current state and the mission goal.${JSON_SCHEMA}`,
+        systemPrompt: `You are Alex, the Project Orchestrator. Your role is to plan, delegate, and evaluate. Be decisive and extremely concise. Focus only on the delta between the current state and the mission goal.`,
         history: [], color: '#6366f1', desc: 'Plans sprints & evaluates outcomes.', enabled: true, builtIn: true
     },
     {
         id: 'programmer', name: 'Codey', role: 'Lead Programmer', icon: 'code',
-        systemPrompt: `You are Codey, Lead Programmer. Write complete working code. Use write_file for new source files, edit_file to add to existing ones.${JSON_SCHEMA}`,
+        systemPrompt: `You are Codey, Lead Programmer. Write complete working code. Use write_file for new source files, edit_file to add to existing ones.`,
         history: [], color: '#10b981', desc: 'Writes complete working code.', enabled: true, builtIn: true
     },
     {
         id: 'designer', name: 'Vidia', role: 'UI Designer', icon: 'palette',
-        systemPrompt: `You are Vidia, UI Designer. Create layouts, CSS, UX flows. write_file for new files, edit_file to extend teammates' files.${JSON_SCHEMA}`,
+        systemPrompt: `You are Vidia, UI Designer. Create layouts, CSS, UX flows. write_file for new files, edit_file to extend teammates' files.`,
         history: [], color: '#f59e0b', desc: 'Designs UI layouts and styles.', enabled: true, builtIn: true
     },
     {
         id: 'tester', name: 'Buster', role: 'Quality Tester', icon: 'shield-check',
-        systemPrompt: `You are Buster, Quality Tester. Review code and design. Set status=needs_review if issues found.${JSON_SCHEMA}`,
+        systemPrompt: `You are Buster, Quality Tester. Review code and design. Set status=needs_review if issues found.`,
         history: [], color: '#ef4444', desc: 'Audits quality and flags issues.', enabled: true, builtIn: true
     },
     {
         id: 'psychologist', name: 'Sigmund', role: 'UX Psychologist', icon: 'brain',
-        systemPrompt: `You are Sigmund, UX Psychologist. Apply cognitive principles: visual hierarchy, Fitts law, Gestalt. Be specific and concise.${JSON_SCHEMA}`,
+        systemPrompt: `You are Sigmund, UX Psychologist. Apply cognitive principles: visual hierarchy, Fitts law, Gestalt. Be specific and concise.`,
         history: [], color: '#fbbf24', desc: 'Applies psychology to UX decisions.', enabled: true, builtIn: true
     },
     {
         id: 'analyst', name: 'Ana', role: 'Data Analyst', icon: 'bar-chart-2',
-        systemPrompt: `You are Ana, Data Analyst. Research, data structures, algorithms, math.${JSON_SCHEMA}`,
+        systemPrompt: `You are Ana, Data Analyst. Research, data structures, algorithms, math.`,
         history: [], color: '#8b5cf6', desc: 'Research and data modeling.', enabled: true, builtIn: true
     },
     {
         id: 'copywriter', name: 'Pen', role: 'Copywriter', icon: 'edit-3',
-        systemPrompt: `You are Pen, Copywriter. Write READMEs, docstrings, user-facing text. write_file for new docs, edit_file to extend.${JSON_SCHEMA}`,
+        systemPrompt: `You are Pen, Copywriter. Write READMEs, docstrings, user-facing text. write_file for new docs, edit_file to extend.`,
         history: [], color: '#ec4899', desc: 'Docs, READMEs, and copy.', enabled: true, builtIn: true
     }
 ];
@@ -66,20 +106,49 @@ let projectFiles = {};
 let fileMetadata = {};
 let logEntries = [];
 let isMissionRunning = false;
-let activeDirectoryHandle = null;
+let projectName = 'default-project';
 let currentEditingAgentId = null;
 let activeFilename = null;
 let isReadOnly = false;
+let activeDirectoryHandle = null;
 let activeSessionBackup = null;
 let sprintStatuses = [];
+let isLocalEngine = window.location.port === "8000";
 
 // Init
 function init() {
     loadSession();
+    if (isLocalEngine) {
+        document.getElementById('local-engine-pill').style.display = 'block';
+        document.getElementById('local-project-group').style.display = 'block';
+        syncWithLocalFilesystem();
+    } else {
+        document.getElementById('web-folder-group').style.display = 'block';
+        addLog('System', 'Hybrid Mode: Local Engine not detected. Using Web File System API.', 'system');
+    }
     renderAgents();
     setupEventListeners();
     renderFileTree();
     renderMissionArchive();
+}
+
+async function syncWithLocalFilesystem() {
+    const pName = document.getElementById('project-name')?.value.trim() || projectName;
+    try {
+        const res = await fetch('/api/list', { method: 'POST', body: JSON.stringify({ projectName: pName }) });
+        const data = await res.json();
+        if (data.status === 'ok' && Array.isArray(data.files)) {
+            const newFiles = {};
+            for (const f of data.files) {
+                const fRes = await fetch('/api/read', { method: 'POST', body: JSON.stringify({ projectName: pName, filename: f }) });
+                const fData = await fRes.json();
+                if (fData.status === 'ok') newFiles[f] = fData.content;
+            }
+            projectFiles = newFiles;
+            renderFileTree();
+            addLog('System', `Synced project folder: [${pName}]`, 'system');
+        }
+    } catch (e) { console.error('Local sync failed:', e); }
 }
 
 // Render Agents
@@ -164,7 +233,7 @@ function saveNewAgent() {
     nextCustomColorIdx++;
     agents.push({
         id, name, role: role || 'Custom Agent', icon: 'bot',
-        systemPrompt: prompt + JSON_SCHEMA,
+        systemPrompt: prompt,
         history: [], color, desc: desc || 'Custom agent.', enabled: true, builtIn: false
     });
     document.getElementById('add-agent-modal').style.display = 'none';
@@ -254,11 +323,28 @@ function setupEventListeners() {
         } catch (e) { el.innerText = `Failed (${e.message})`; el.style.color = '#ef4444'; }
     });
 
-    document.getElementById('pick-folder').addEventListener('click', async () => {
+    document.getElementById('project-name').addEventListener('input', (e) => {
+        projectName = e.target.value.trim() || 'default-project';
+        saveSession();
+    });
+
+    document.getElementById('select-folder').addEventListener('click', async () => {
         try {
-            activeDirectoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-            document.getElementById('project-folder').value = activeDirectoryHandle.name;
-        } catch { }
+            activeDirectoryHandle = await window.showDirectoryPicker();
+            addLog('System', 'Project folder linked: ' + activeDirectoryHandle.name, 'system');
+            // Scan for existing files
+            const files = {};
+            for await (const entry of activeDirectoryHandle.values()) {
+                if (entry.kind === 'file') {
+                    const file = await entry.getFile();
+                    files[entry.name] = await file.text();
+                }
+            }
+            projectFiles = files;
+            renderFileTree();
+        } catch (err) {
+            console.error('Folder picker failed', err);
+        }
     });
 
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -305,6 +391,34 @@ function setupEventListeners() {
             alert('Failed to generate ZIP.');
         }
     });
+    document.getElementById('edit-comm-rules').addEventListener('click', () => {
+        document.getElementById('comm-rules-text').value = communicationRules;
+        document.getElementById('comm-rules-modal').style.display = 'flex';
+    });
+
+    document.getElementById('close-comm-rules').addEventListener('click', () => {
+        document.getElementById('comm-rules-modal').style.display = 'none';
+    });
+
+    document.getElementById('reset-comm-rules').addEventListener('click', () => {
+        if (!confirm('Reset communication rules to defaults? This will restore the search/replace protocols.')) return;
+        const schema = 'TEMPLATE (REQUIRED):\n{\n  "logic": "1-sentence decision",\n  "actions": [\n    { "type": "read_file", "filename": "path.ext" },\n    { "type": "write_file", "filename": "path.ext", "content": "..." },\n    { "type": "edit_file", "filename": "path.ext", "search": "...", "replace": "..." },\n    { "type": "run_command", "command": "..." }\n  ],\n  "status": "complete | needs_review",\n  "message": "Succinct summary."\n}';
+        
+        const rules = '\n\nCOMMUNICATION RULES:\n1. READ BEFORE EDIT: Always read_file first.\n2. NO SHELL READING: Do NOT use cat/type in run_command to read files.\n3. Chain multiple actions in the \'actions\' array.\n4. For edit/insert, \'search\' MUST match EXACTLY.\n5. use run_command to verify code.\n\nEXAMPLE (READ + EDIT):\n{\n  "logic": "Reading before refactor.",\n  "actions": [\n    { "type": "read_file", "filename": "main.py" },\n    { "type": "edit_file", "filename": "main.py", "search": "old", "replace": "new" }\n  ],\n  "status": "complete",\n  "message": "Read and refactored."\n}';
+        
+        const defaults = schema + rules;
+        document.getElementById('comm-rules-text').value = defaults;
+        communicationRules = defaults;
+        saveSession();
+        addLog('System', 'Communication rules reset to defaults.', 'system');
+    });
+
+    document.getElementById('save-comm-rules').addEventListener('click', () => {
+        communicationRules = document.getElementById('comm-rules-text').value;
+        document.getElementById('comm-rules-modal').style.display = 'none';
+        saveSession();
+        addLog('System', 'Global communication rules updated.', 'system');
+    });
 }
 
 // Session Persistence
@@ -320,6 +434,9 @@ function saveSession() {
         missionScope: document.getElementById('project-description').value,
         serverIp: document.getElementById('server-ip').value,
         modelName: document.getElementById('llm-model').value,
+        communicationRules,
+        useThinking: document.getElementById('llm-think').checked,
+        projectName,
     };
     localStorage.setItem('ai_team_active', JSON.stringify(data));
 }
@@ -335,18 +452,32 @@ function loadSession() {
         if (data.missionScope) document.getElementById('project-description').value = data.missionScope;
         if (data.serverIp) document.getElementById('server-ip').value = data.serverIp;
         if (data.modelName) document.getElementById('llm-model').value = data.modelName;
+        if (data.projectName) {
+            projectName = data.projectName;
+            document.getElementById('project-name').value = projectName;
+        }
+        if (data.hasOwnProperty('useThinking')) document.getElementById('llm-think').checked = data.useThinking;
         if (data.agentData) {
             data.agentData.forEach(d => {
                 const agent = agents.find(a => a.id === d.id);
                 if (agent) {
                     agent.history = d.history || [];
-                    agent.systemPrompt = d.prompt || agent.systemPrompt;
+                    let p = d.prompt || agent.systemPrompt;
+                    // Migration: Remove legacy JSON_SCHEMA if present in saved prompts
+                    if (p.includes('TEMPLATE (REQUIRED):')) {
+                        p = p.split('TEMPLATE (REQUIRED):')[0].trim();
+                    }
+                    agent.systemPrompt = p;
                     if (typeof d.enabled === 'boolean') agent.enabled = d.enabled;
                 } else if (d.builtIn === false && d.name) {
+                    let p = d.prompt || '';
+                    if (p.includes('TEMPLATE (REQUIRED):')) {
+                        p = p.split('TEMPLATE (REQUIRED):')[0].trim();
+                    }
                     // Re-create custom agent from saved data
                     agents.push({
                         id: d.id, name: d.name, role: d.role || 'Custom Agent',
-                        icon: d.icon || 'bot', systemPrompt: d.prompt || '',
+                        icon: d.icon || 'bot', systemPrompt: p,
                         history: d.history || [], color: d.color || '#06b6d4',
                         desc: d.desc || 'Custom agent.',
                         enabled: typeof d.enabled === 'boolean' ? d.enabled : true,
@@ -354,6 +485,16 @@ function loadSession() {
                     });
                 }
             });
+        }
+        if (data.communicationRules) {
+            // Migration: Only use stored rules if they support the current protocol (search)
+            if (data.communicationRules.includes('search')) {
+                communicationRules = data.communicationRules;
+            } else {
+                console.log('Old communication rules detected - updating to latest protocol.');
+                addLog('System', 'Updated global rules to latest protocol (search/replace).', 'system');
+                // Keep the default communicationRules defined at top of app.js
+            }
         }
         logEntries.forEach(e => renderLogEntry(e.agent, e.msg, e.type, e.time, true));
     } catch { }
@@ -518,21 +659,36 @@ function renderLogEntry(agentName, message, type, time, isReplay) {
 }
 
 // File Commit
-async function commitFile(filename, content, authorName, mode) {
+async function commitFile(filename, content, authorName, mode, search, replace) {
     if (!mode) mode = 'write';
     const agentObj = agents.find(a => a.name === authorName);
     const authorColor = agentObj ? agentObj.color : '#6b7280';
     const existing = projectFiles[filename];
-    const safeContent = safeStr(content);
 
-    if (mode === 'edit' && existing) {
-        const separator = '\n\n# -- Added by ' + authorName + ' --\n';
-        projectFiles[filename] = existing + separator + safeContent;
-        fileMetadata[filename] = Object.assign({}, fileMetadata[filename], { modified: authorName, modifiedColor: authorColor });
-        addLog('System', authorName + ' expanded `' + filename + '`', 'system');
+    if ((mode === 'edit' || mode === 'insert_before' || mode === 'insert_after') && existing) {
+        if (!search) {
+            const err = authorName + ' tried to ' + mode + ' `' + filename + '` without a `search` block.';
+            addLog('System', err, 'system');
+            throw new Error(err);
+        }
+        if (existing.includes(search)) {
+            let newContent = existing;
+            if (mode === 'edit') newContent = existing.replace(search, replace || '');
+            else if (mode === 'insert_before') newContent = existing.replace(search, (content || '') + search);
+            else if (mode === 'insert_after') newContent = existing.replace(search, search + (content || ''));
+            
+            projectFiles[filename] = newContent;
+            fileMetadata[filename] = Object.assign({}, fileMetadata[filename], { modified: authorName, modifiedColor: authorColor });
+            addLog('System', authorName + ' modified `' + filename + '` (' + mode + ')', 'system');
+        } else {
+            const msg = `FAILED: Search block not found in "${filename}". Use the EXACT string including whitespace. Tip: Read the file first to copy the exact lines.`;
+            addLog('System', authorName + ': ' + msg, 'system');
+            throw new Error(msg);
+        }
     } else {
-        if (existing && safeContent.length < existing.length * 0.6) {
-            addLog('System', authorName + ' tried to overwrite `' + filename + '` with shorter content - blocked. Use edit_file.', 'system');
+        const safeContent = safeStr(content);
+        if (existing && safeContent.length < existing.length * 0.6 && mode !== 'edit') {
+            addLog('System', authorName + ' tried to overwrite `' + filename + '` with much shorter content - blocked. Use edit_file.', 'system');
             return;
         }
         projectFiles[filename] = safeContent;
@@ -550,13 +706,52 @@ async function commitFile(filename, content, authorName, mode) {
     document.getElementById('workspace-badge').style.display = 'inline-block';
     if (!isReadOnly) saveSession();
 
-    if (activeDirectoryHandle) {
+    if (isLocalEngine) {
+        const pName = document.getElementById('project-name')?.value.trim() || projectName;
+        try {
+            await fetch('/api/write', {
+                method: 'POST',
+                body: JSON.stringify({ projectName: pName, filename, content: projectFiles[filename] })
+            });
+        } catch (e) { console.error('Local write failed:', e); }
+    } else if (activeDirectoryHandle) {
         try {
             const h = await activeDirectoryHandle.getFileHandle(filename, { create: true });
             const w = await h.createWritable();
             await w.write(projectFiles[filename]);
             await w.close();
-        } catch (err) { }
+            addLog('System', 'Synced `' + filename + '` to local disk via Web API.', 'system');
+        } catch (err) {
+            addLog('System', 'Web Storage Error: Ensure you have granted folder permissions.', 'error');
+        }
+    }
+}
+
+async function executeLocalCommand(command, agentName) {
+    if (!isLocalEngine) {
+        const msg = "Terminal / run_command requires the Local Python Engine (not available in Web Mode).";
+        addLog('System', msg, 'error');
+        return { error: msg };
+    }
+    const pName = document.getElementById('project-name')?.value.trim() || projectName;
+    addLog('System', `${agentName} executing: \`${command}\``, 'system');
+    try {
+        const res = await fetch('/api/run', {
+            method: 'POST',
+            body: JSON.stringify({ projectName: pName, command })
+        });
+        const data = await res.json();
+        if (data.status === 'ok') {
+            const output = (data.stdout || '') + (data.stderr || '');
+            addLog('System', `Output:\n${output.substring(0, 500)}${output.length > 500 ? '...' : ''}`, 'system');
+            return data;
+        } else {
+            addLog('System', `Error: ${data.error}`, 'system');
+            return data;
+        }
+    } catch (e) {
+        addLog('System', `Failed to run command: ${e.message}`, 'system');
+        return { error: e.message };
     }
 }
 
@@ -579,7 +774,10 @@ async function callLLM(agent, userPrompt, onChunk) {
         body: JSON.stringify({
             model: model,
             messages: [
-                { role: 'system', content: agent.systemPrompt },
+                { 
+                    role: 'system', 
+                    content: agent.systemPrompt + (communicationRules ? `\n\nCOMMUNICATION RULES:\n${communicationRules}` : '')
+                },
                 ...agent.history.map(m => {
                     // Sanitize history to prevent loop propagation
                     if (m.role === 'assistant') {
@@ -597,7 +795,7 @@ async function callLLM(agent, userPrompt, onChunk) {
                 { role: 'user', content: userPrompt }
             ],
             format: 'json',
-            think: true,
+            think: document.getElementById('llm-think').checked,
             options: {
                 temperature: parseFloat(document.getElementById('llm-temp').value) || 0.7,
                 num_ctx: 16384
@@ -608,6 +806,14 @@ async function callLLM(agent, userPrompt, onChunk) {
 
     if (!res.ok) {
         const errText = await res.text();
+        // Detect if thinking is unsupported
+        if (res.status === 400 && (errText.includes('think') || errText.includes('unknown field'))) {
+            addLog('System', `Model "${model}" does not support thinking mode. Disabling...`, 'system');
+            document.getElementById('llm-think').checked = false;
+            saveSession();
+            // Retry once without thinking
+            return callLLM(agent, userPrompt, onChunk);
+        }
         throw new Error('HTTP ' + res.status + ': ' + errText);
     }
 
@@ -712,26 +918,56 @@ async function runAgentTurn(agentId, prompt, statusMsg) {
                 if (slot) {
                     const sc = parsed.status === 'complete' ? '#10b981' : (parsed.status === 'needs_review' ? '#f59e0b' : '#ef4444');
                     const label = parsed.status.replace('_', ' ').toUpperCase();
-                    slot.innerHTML = '<span class="log-status-badge" style="background:' + sc + '22;color:' + sc + '">' + label + '</span>';
+                    let badgeHtml = '<span class="log-status-badge" style="background:' + sc + '22;color:' + sc + '">' + label + '</span>';
+                    
+                    if (parsed.actions && parsed.actions.length > 1) {
+                        badgeHtml += ' <span class="log-status-badge" style="background:rgba(255,255,255,0.05);color:var(--text-muted);">' + parsed.actions.length + ' ACTIONS</span>';
+                    }
+                    slot.innerHTML = badgeHtml;
+                }
+            }
+
+            if ((parsed.logic || parsed.thoughts)) {
+                const lbody = logRef.querySelector('.log-card-body');
+                if (lbody) {
+                    const t = document.createElement('div');
+                    t.className = 'log-card-thoughts';
+                    t.innerText = '\ud83d\udcad ' + safeStr(parsed.logic || parsed.thoughts);
+                    lbody.appendChild(t);
                 }
             }
         }
 
-        if ((parsed.logic || parsed.thoughts) && logRef) {
-            const body = logRef.querySelector('.log-card-body');
-            if (body) {
-                const t = document.createElement('div');
-                t.className = 'log-card-thoughts';
-                t.innerText = '\ud83d\udcad ' + safeStr(parsed.logic || parsed.thoughts);
-                body.appendChild(t);
-            }
+        const actionQueue = Array.isArray(parsed.actions) ? parsed.actions : [];
+        if (actionQueue.length === 0 && parsed.action) {
+            actionQueue.push({
+                type: parsed.action, filename: parsed.filename, content: parsed.content,
+                search: parsed.search, replace: parsed.replace, command: parsed.command
+            });
         }
 
-        if (parsed.action === 'write_file' && parsed.filename && parsed.content) {
-            await commitFile(parsed.filename, safeStr(parsed.content), agent.name, 'write');
-        }
-        if (parsed.action === 'edit_file' && parsed.filename && parsed.content) {
-            await commitFile(parsed.filename, safeStr(parsed.content), agent.name, 'edit');
+        for (const act of actionQueue) {
+            const type = act.type || act.action;
+            if (type === 'write_file' && act.filename && act.content) {
+                await commitFile(act.filename, safeStr(act.content), agent.name, 'write');
+            } else if (type === 'edit_file' && act.filename) {
+                await commitFile(act.filename, null, agent.name, 'edit', act.search, act.replace);
+            } else if (type === 'insert_before' && act.filename) {
+                await commitFile(act.filename, safeStr(act.content), agent.name, 'insert_before', act.search);
+            } else if (type === 'read_file' && act.filename) {
+                const content = projectFiles[act.filename] || '(File empty or not found)';
+                agent.history.push({ role: 'user', content: `Content of "${act.filename}":\n\n${content}` });
+                addLog('System', agent.name + ' read `' + act.filename + '`', 'system');
+            } else if (type === 'insert_after' && act.filename) {
+                await commitFile(act.filename, safeStr(act.content), agent.name, 'insert_after', act.search);
+            } else if (type === 'run_command' && act.command) {
+                const result = await executeLocalCommand(act.command, agent.name);
+                if (result && result.status === 'ok') {
+                    agent.history.push({ role: 'user', content: `Command output (exit ${result.code}):\n${result.stdout}\n${result.stderr}` });
+                } else if (result && result.error) {
+                    agent.history.push({ role: 'user', content: `Command failed: ${result.error}` });
+                }
+            }
         }
 
         if (parsed.action === 'ask' && parsed.ask && parsed.ask.to && parsed.ask.question) {
@@ -753,6 +989,7 @@ async function runAgentTurn(agentId, prompt, statusMsg) {
 
     } catch (e) {
         addLog('System', 'Error (' + agent.name + '): ' + e.message, 'system');
+        agent.history.push({ role: 'user', content: 'SYSTEM ERROR: ' + e.message });
         throw e;
     } finally {
         if (card) card.classList.remove('pulse');
