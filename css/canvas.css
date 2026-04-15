@@ -1,0 +1,107 @@
+/* Mission Canvas - Professional Checklist UI */
+
+.mission-canvas {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    word-break: break-word;
+    box-shadow: none;
+}
+
+.mission-canvas h2 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.phase-block {
+    margin-bottom: 1.5rem;
+}
+
+.phase-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-main);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.phase-header i {
+    width: 14px;
+    color: var(--accent-secondary);
+}
+
+.task-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-left: 0.5rem;
+}
+
+.task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    transition: var(--transition);
+}
+
+.task-item.completed {
+    color: rgba(16, 185, 129, 0.6);
+}
+
+.task-item.active {
+    color: var(--text-main);
+    font-weight: 500;
+}
+
+.task-checkbox {
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.task-item.completed .task-checkbox {
+    background: #10b981;
+    border-color: #10b981;
+    color: white;
+}
+
+.task-content {
+    line-height: 1.4;
+}
+
+.task-item.completed .task-content {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* Scrollbar for canvas */
+.mission-canvas::-webkit-scrollbar {
+    width: 3px;
+}
+
+.mission-canvas::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+}

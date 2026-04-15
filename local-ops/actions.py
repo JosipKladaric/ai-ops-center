@@ -43,7 +43,28 @@ def write_file(project_name, filename, content):
     
     return {"status": "ok", "filename": filename, "project": project_name}
 
+COMMAND_WHITELIST = {
+    'python', 'pip', 'npm', 'node', 'npx', 'git',
+    'dir', 'echo', 'type', 'mkdir', 'ls', 'cat', 'pwd',
+    'venv', 'virtualenv', 'pytest', 'npm-test'
+}
+
+def is_safe_command(command):
+    """Basic check to see if the command starts with a whitelisted tool."""
+    cmd_parts = command.strip().split()
+    if not cmd_parts:
+        return False
+    
+    executable = cmd_parts[0].lower().replace('.exe', '')
+    # Handle paths like .\venv\Scripts\python
+    executable = os.path.basename(executable)
+    
+    return executable in COMMAND_WHITELIST
+
 def run_command(project_name, command):
+    if not is_safe_command(command):
+        return {"error": f"Command '{command.split()[0]}' is not in the whitelist. Forbidden for security."}
+    
     root = get_project_path(project_name)
     try:
         # Run command inside the project directory

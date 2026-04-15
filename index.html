@@ -5,7 +5,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Team Ops Center</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/activity.css">
+    <link rel="stylesheet" href="css/repo.css">
+    <link rel="stylesheet" href="css/canvas.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -14,6 +19,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 </head>
 
 <body>
@@ -37,7 +44,7 @@
 
             <div class="input-group">
                 <label for="llm-model">Model</label>
-                <input type="text" id="llm-model" value="qwen3.5:9b">
+                <input type="text" id="llm-model" value="gemini-3-flash-preview:cloud">
             </div>
 
             <div id="local-project-group" class="input-group" style="display: none;">
@@ -89,7 +96,7 @@
             </div>
 
             <button class="btn btn-secondary" id="reset-session"
-                style="margin-top: 0.5rem; border: 1px dashed #ef444433; color: #ef4444;">
+                style="margin-top: 0.5rem; border: 1px dashed #ef444433; color: #ef4444; font-size: 0.7rem; padding: 6px 4px;">
                 <i data-lucide="refresh-ccw" style="width: 14px;"></i> Reset Session
             </button>
 
@@ -109,39 +116,34 @@
                 style="display:none; background: rgba(99,102,241,0.1); border: 1px solid #6366f155; border-radius: var(--radius-md); padding: 8px 14px; margin-bottom: 1rem; display: none; justify-content: space-between; align-items: center;">
                 <span style="font-size: 0.75rem; color: #6366f1;">📁 READ-ONLY — <span
                         id="readonly-title"></span></span>
-                <button onclick="exitReadOnly()" class="btn btn-secondary"
+                <button onclick="window.aiTeam.exitReadOnly()" class="btn btn-secondary"
                     style="font-size: 0.65rem; padding: 3px 10px; width: auto;">Exit</button>
             </div>
 
-            <header style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: flex-start;">
-                <div>
-                    <div style="display: flex; align-items: center; gap: 0.75rem;">
-                        <h1>AI Operation Center</h1>
-                        <button class="btn-icon" id="edit-comm-rules" title="Communication Rules" style="width: 28px; height: 28px;">
-                            <i data-lucide="message-square-quote" style="width: 14px;"></i>
-                        </button>
-                        <div id="local-engine-pill" style="display:none; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b98155; color: #10b981; font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.05em;">LOCAL ENGINE</div>
-                    </div>
-                    <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.25rem;">Multi-agent collaborative environment.</p>
+            <!-- 1. Mission Roadmap (Integrated Top) -->
+            <div id="mission-canvas-container" style="display: none; margin-bottom: 2rem;">
+                <div class="mission-canvas">
+                    <h2><i data-lucide="list-checks" style="width: 18px; height: 18px;"></i> Mission Roadmap</h2>
+                    <div id="mission-canvas-content"></div>
                 </div>
-            </header>
-
-            <!-- Status Banner -->
-            <div id="status-banner"
-                style="display:none; border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: 1rem; font-size: 0.8rem; font-weight: 600; border: 1px solid;">
             </div>
 
-            <div id="team-grid" class="agent-grid"></div>
+            <!-- 2. Status Banner -->
+            <div id="status-banner"
+                style="display:none; border-radius: var(--radius-md); padding: 10px 16px; margin-bottom: 1.5rem; font-size: 0.8rem; font-weight: 600; border: 1px solid;">
+            </div>
 
-            <section style="margin-top: auto; padding-top: 2rem;">
-                <div
-                    style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1rem;">
-                    Mission Pipeline</div>
-                <div id="pipeline-stepper" style="display: flex; gap: 0.5rem; flex-wrap: wrap;"></div>
-                <div id="pipeline-status"
-                    style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-muted); font-family: 'Fira Code', monospace;">
-                    Ready...</div>
-            </section>
+            <!-- 3. The Team Header -->
+            <div style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+                <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">The Team</div>
+                <div id="local-engine-pill" style="display:none; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b98155; color: #10b981; font-size: 0.6rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.05em;">LOCAL ENGINE</div>
+                <button class="btn-icon" id="edit-comm-rules" title="Communication Rules" style="width: 24px; height: 24px; border: none; background: rgba(255,255,255,0.03);">
+                    <i data-lucide="message-square-quote" style="width: 12px;"></i>
+                </button>
+                <div style="flex-grow: 1; height: 1px; background: var(--border-color); opacity: 0.3;"></div>
+            </div>
+            
+            <div id="team-grid" class="agent-grid"></div>
         </main>
 
         <!-- Developer Console -->
@@ -226,7 +228,7 @@
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
     <script>lucide.createIcons();</script>
 
     <!-- Add Agent Modal -->
